@@ -11,6 +11,7 @@ import com.google.gson.Gson;
 import com.google.gson.annotations.SerializedName;
 import org.apache.commons.codec.EncoderException;
 import org.apache.commons.codec.net.URLCodec;
+import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
@@ -23,6 +24,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -155,6 +157,12 @@ public abstract class Request<T extends Response> {
                         throw new AuthorizationAPIException(errorResponse, "Response-Statuscode: " + String.valueOf(status));
                     case 403:
                         throw new AccessAPIException(errorResponse, "Response-Statuscode: " + String.valueOf(status));
+                    case 429:
+                        // We are throttled. Should make this configurable, but let's block until available again
+                        String resetAt = response.getFirstHeader("X-RateLimit-Reset").getValue();
+                        long sleepMillis = Long.parseLong(resetAt) * 1000 - new Date().getTime();
+                        Thread.sleep(sleepMillis + 5000);
+                        return execute();
                     default:
                         throw new APIException(errorResponse, "Response-Statuscode: " + String.valueOf(status));
                 }
